@@ -19,7 +19,6 @@ def get_fft(file_path):
    fs, data = wavfile.read(file_path)
    data = np.mean(data, axis=1)
    yf=rfft(data)
-   print(len(yf))
    return yf
 
 
