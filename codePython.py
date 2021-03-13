@@ -15,6 +15,7 @@ from scipy.fft import rfft, rfftfreq
 import os
 from scipy.spatial import distance
 import time
+import h5py
 
 def get_fft(file_path):
    samples, sampling_rate = librosa.load(file_path,sr=None, mono=True, offset=0.0,duration=None )        
@@ -62,7 +63,8 @@ def get_time_codes(file_path,coeff):
            invert_coeff=int(1/coeff)
            for k in range (1,invert_coeff):
                new_tab.append(tab[i]+dist*coeff*k)
-           i+=1  
+           i+=1
+   np.save('timecodes',new_tab) 
    return new_tab
 
 
@@ -158,8 +160,17 @@ def minimum(matrice):
     mini=[]
     for i in range(0,len(matrice)):
         liste=matrice[i]
-        m=np.min(liste)
-        mini.append((m,liste.index(m)))
+        if i==0:
+            m=(liste[1],1)
+        else:   
+            m=(liste[0],0)
+        for k in range (0,len(liste)):
+            if liste[k]<m[0] and k!=i and liste[k]>0.001:
+                m=(liste[k],k)
+        mini.append(m)
+        
+
+        
     return mini
 
 def tri(seuil,matrice):
@@ -170,35 +181,71 @@ def tri(seuil,matrice):
             trie.append((j,matrice[j][1]))
     return trie
             
+def display(matrice):
+    figure = plt.figure() 
+    axes = figure.add_subplot(111) 
+    caxes = axes.matshow(matrice,interpolation ='nearest')
+    figure.colorbar(caxes) 
+    plt.show()
 
+def inter_to_tc(inter,tc):
+    newtab=[]
+    for e in inter:
+        a=tc[e[0]]
+        b=tc[e[1]]
+        ntc=(a,b)
+        newtab.append(ntc)
+    return newtab
 
+def generate(timecodes,file_path,newtimecodes,length):
+    duree=0
+    newAudio = AudioSegment.from_wav(file_path)
+    debut=0
 
+    i=0
+    while duree<=length:
+        fin=newtimecodes[i][0]
+        j=i
+        while fin<=debut:
+            j+=1
+            fin=newtimecodes[j+1][0]
+        newAudio += newAudio[debut*1000:fin*1000]
+        duree+=fin-debut
+        debut=newtimecodes[i][1]    
+    print(duree)            
+    newAudio.export('infinite_audio.wav', format="wav")
+    return newAudio
 
 
 file_path="./Get_lucky.wav"
 
-
+'''
 tps1=time.time()
-test = get_all_fft(file_path,10)
+test = get_all_fft(file_path,1)
 tps2=time.time()
 print("temps pour récupérer les ffts :",tps2-tps1," secondes")
 
-#print(distance_eucl(test[5], test[6]))
-#print(distanceKL(test[5],test[6]))
-#print(distanceIS(test[5],test[6]))
-mat=matrice_dist(test,1)
 
-print(mat)
-
-figure = plt.figure() 
-axes = figure.add_subplot(111) 
-caxes = axes.matshow(mat,interpolation ='nearest')
-figure.colorbar(caxes) 
-  
-
-plt.show()
 tps3=time.time()
+mat=matrice_dist(test,1)
+np.save('test.txt', mat)
 
 print("temps pour comparer tous les ffts :",tps3-tps2," secondes")
+
+'''
+
+tc=np.load('timecodes.npy')
+m = np.load('test.txt.npy')
+display(m)
+t=tri(31,m)
+ntc=inter_to_tc(t,tc)
+print(ntc)
+
+
+
+#forwardTC=ntc[:len(ntc)//2-1]
+#backwardTC=ntc[len(ntc)//2-1:len(ntc)]
+#generate(tc,file_path,ntc,300)
+
 
 
