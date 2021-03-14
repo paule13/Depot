@@ -201,14 +201,14 @@ def generate(timecodes,file_path,newtimecodes,length):
     duree=0
     newAudio = AudioSegment.from_wav(file_path)
     debut=0
-
     i=0
     while duree<=length:
         fin=newtimecodes[i][0]
-        j=i
-        while fin<=debut:
+        j=0
+        while fin<debut:
             j+=1
-            fin=newtimecodes[j+1][0]
+            fin=newtimecodes[j][0]
+        i=j
         newAudio += newAudio[debut*1000:fin*1000]
         duree+=fin-debut
         debut=newtimecodes[i][1]    
@@ -245,7 +245,7 @@ print(ntc)
 
 #forwardTC=ntc[:len(ntc)//2-1]
 #backwardTC=ntc[len(ntc)//2-1:len(ntc)]
-#generate(tc,file_path,ntc,300)
+generate(tc,file_path,ntc,300)
 
 
 
