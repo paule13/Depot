@@ -1,4 +1,3 @@
-
 import pandas as pd
 import librosa
 from librosa import display
@@ -16,6 +15,7 @@ import os
 from scipy.spatial import distance
 import time
 import h5py
+import random
 
 def get_fft(file_path):
    samples, sampling_rate = librosa.load(file_path,sr=None, mono=True, offset=0.0,duration=None )        
@@ -77,6 +77,7 @@ def get_all_fft(file_path,coeff):
         newAudio = newAudio[time_codes[i-1]*1000:time_codes[i]*1000]
         newAudio.export('extrait.wav', format="wav")
         fft=get_fft('./extrait.wav')
+        fft=np.abs(fft)
         if i==1:    #On cherche le fft de longueur minimale
             min_len_fft=len(fft)
         else:
@@ -98,18 +99,12 @@ def normalize_size(T,mini):
     return normalized_tab
 
 def distance_eucl(tab1,tab2):
-    temp=[]
-    for i in range(0,len(tab1)-1):
-        e=(tab1[i]-tab2[i])**2
-        temp.append(e)
-    s=0
-    for e in temp:
-        s=s+e
-    s=np.abs(s)
-    if s==0.0:
-        return 1.0
-    s=np.log(s)
-    return s
+    norm=np.linalg.norm([(b - a)**2 for a, b in zip(tab1, tab2)])
+    if norm==0:
+        return np.nan
+    else:
+        
+        return np.log(norm)
 
 def distanceKL(tab1,tab2):
     s=0
@@ -118,7 +113,6 @@ def distanceKL(tab1,tab2):
             s+=0.0001
         else:     
             s+=(tab1[i]*np.log(tab1[i]/tab2[i])-tab1[i]+tab2[i])
-    s=np.abs(s)
     return s
 
 
@@ -129,14 +123,8 @@ def distanceIS(tab1,tab2):
             s+=0.0001
         else:
             s+=(tab1[i]/tab2[i]-np.log(tab1[i]/tab2[i])-1)
-    s=np.abs(s)
     return s
-
-
-def make_sym(a):
-    w, h = a.shape
-    a[w - w // 2 :, :] = np.flipud(a[:w // 2, :])
-    a[:, h - h // 2:] = np.fliplr(a[:, :h // 2])                
+          
 
 
 def matrice_dist (tab_fft,type_distance):
@@ -144,16 +132,13 @@ def matrice_dist (tab_fft,type_distance):
     print("nombre de fft ",len(tab_fft))
     for i in range(0,len(tab_fft)-1):
         for j in range(0,len(tab_fft)-1):
-            if type_distance==1:
+            if type_distance=="eucl":
                 matrice[i][j]=distance_eucl(tab_fft[i],tab_fft[j])
-            if type_distance==2:
+            if type_distance=="KL":
                 matrice[i][j]=distanceKL(tab_fft[i],tab_fft[j])
-            if type_distance==3:
+            if type_distance=="IS":
                 matrice[i][j]=distanceIS(tab_fft[i],tab_fft[j])
     return matrice
-
-
-
 
 
 def minimum(matrice):
@@ -197,55 +182,75 @@ def inter_to_tc(inter,tc):
         newtab.append(ntc)
     return newtab
 
-def generate(timecodes,file_path,newtimecodes,length):
+
+def proba(prob):
+    rand=random.random()
+    if rand<prob:
+        return True
+    else:
+        return False
+    
+    
+def generate(file_path,newtimecodes,length,prob):
+    if len(newtimecodes)==0:
+        print('Aucune similarité détecté avec ces paramètres')
+        return False
+    tab_duree=[]
     duree=0
     newAudio = AudioSegment.from_wav(file_path)
-    debut=0
-    i=0
-    while duree<=length:
-        fin=newtimecodes[i][0]
+    newAudio1 = newAudio[0:newtimecodes[0][0]*1000]
+    debut=newtimecodes[0][1]
+    duree+=newtimecodes[0][0]
+    tab_duree.append(int(duree))
+    while duree<length:
+        
+        fin=newtimecodes[0][0]
         j=0
-        while fin<debut:
+        while fin<debut+0.001 or proba(prob)==False:
+            if j==len(newtimecodes)-1:
+                j=0
             j+=1
             fin=newtimecodes[j][0]
-        i=j
-        newAudio += newAudio[debut*1000:fin*1000]
-        duree+=fin-debut
-        debut=newtimecodes[i][1]    
-    print(duree)            
-    newAudio.export('infinite_audio.wav', format="wav")
-    return newAudio
+        newAudio1 += newAudio[debut*1000:fin*1000]
+        duree+=abs(fin-debut)
+        tab_duree.append(int(duree))
+        debut=newtimecodes[j][1]
+        
+    newAudio1.export('infinite_audio.wav', format="wav")
+    return tab_duree
 
 
 file_path="./Get_lucky.wav"
 
-'''
+
+
+
 tps1=time.time()
-test = get_all_fft(file_path,1)
+ffts = get_all_fft(file_path,1)
 tps2=time.time()
+
+
+
+
 print("temps pour récupérer les ffts :",tps2-tps1," secondes")
-
-
 tps3=time.time()
-mat=matrice_dist(test,1)
-np.save('test.txt', mat)
-
+mat=matrice_dist(ffts,"eucl")
+np.save('distances', mat)       #On sauvgarde la matrice des distances dans un fichier pour eviter de la recalculer
 print("temps pour comparer tous les ffts :",tps3-tps2," secondes")
 
-'''
+display(np.load('distances.npy'))
 
-tc=np.load('timecodes.npy')
-m = np.load('test.txt.npy')
+
+
+intervalles=np.load('timecodes.npy')
+m = np.load('distances.npy')
 display(m)
-t=tri(31,m)
-ntc=inter_to_tc(t,tc)
+triee=tri(32.5,m) #Seuil de 32
+ntc=inter_to_tc(triee,intervalles)
+
+
+print("Sauts que l'on peut effectuer:")
 print(ntc)
-
-
-
-#forwardTC=ntc[:len(ntc)//2-1]
-#backwardTC=ntc[len(ntc)//2-1:len(ntc)]
-generate(tc,file_path,ntc,300)
-
-
-
+print("")
+print("Durées correspondant à un saut qui a été effectué ")
+print(generate(file_path,ntc,600,0.5))
