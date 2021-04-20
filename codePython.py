@@ -17,7 +17,7 @@ from scipy.spatial import distance
 import time
 import h5py
 import random
-
+import soundfile
 
 
 
@@ -25,6 +25,11 @@ def get_fft(data):
    yf=rfft(data)
    return yf
 
+def audiosegment_to_librosawav(audiosegment):    
+    samples = audiosegment.get_array_of_samples()
+    arr = np.array(samples).astype(np.float32)/32768 # 16 bit 
+    arr = librosa.core.resample(arr, audiosegment.frame_rate*2, 22050, res_type='kaiser_best') 
+    return arr
 
 #Affiche la transformée de fourier
 def display_fft(file_path):
@@ -204,13 +209,14 @@ def proba(prob):
     
 
 def generate(file_path,newtimecodes,length,prob):
+    orig, sr = librosa.load(file_path)
     if len(newtimecodes)==0:
         print('Aucune similarité détecté avec ces paramètres')
         return False
     tab_duree=[]
     duree=0
     newAudio = AudioSegment.from_wav(file_path)
-    newAudio1 = newAudio[0:newtimecodes[0][0]*1000]
+    finalArray=[]
     debut=newtimecodes[0][1]
     duree+=newtimecodes[0][0]
     tab_duree.append(int(duree))
@@ -223,37 +229,61 @@ def generate(file_path,newtimecodes,length,prob):
                 j=0
             j+=1
             fin=newtimecodes[j][0]
-        newAudio1 += newAudio[debut*1000:fin*1000]
+        intervalle = newAudio[debut*1000:fin*1000]
+        array = audiosegment_to_librosawav(intervalle)  #On transforme l'audio en un tableau exploitable par librosa
+        out = array.copy()                              #La copie permet de ne pas modifier le fichier originel
+        apply_fadein(out, sr, 0.1)
+        apply_fadeout(out, sr, 0.1)
+        finalArray=np.concatenate((finalArray,out))     
         duree+=abs(fin-debut)
         tab_duree.append(int(duree))
         debut=newtimecodes[j][1]
-        
-    newAudio1.export('infinite_audio.wav', format="wav")
+    soundfile.write('InfiniteAudio.wav', finalArray, samplerate=sr)
     return tab_duree
 
 
+def apply_fadeout(audio, sr, duration):
+    length = int(duration*sr)
+    end = audio.shape[0]
+    start = end - length
+    fade_curve = x = np.linspace(-np.pi/2,0,length)
+    fade_curve = -np.sin(x)
+    audio[start:end] = audio[start:end] * fade_curve
+    
+def apply_fadein(audio, sr, duration):
+    length = int(duration*sr)
+    end = length
+    start = 0
+    fade_curve = np.linspace(0.0, np.pi/2, length)
+    fade_curve = np.sin(fade_curve)
+    audio[start:end] = audio[start:end] * fade_curve    
+    
 file_path="./Get_lucky.wav"
-
-
 
 tps1=time.time()
 test = get_all_fft(file_path,1)
 tps2=time.time()
+
 print("temps pour récupérer les ffts :",tps2-tps1," secondes")
 
 
-tps3=time.time()
-mat=matrice_dist(test,1)
-np.save('matrice_dist_10.txt', mat)
-m=np.load('matrice_dist_10.txt.npy')
 
+mat=matrice_dist(test,'eucl')
+np.save('matrice_dist_10.txt', mat)
+tps3=time.time()
+
+mm=np.load('matrice_dist.npy')
+mm=make_sym(mm)
 
 print("temps pour comparer tous les ffts :",tps3-tps2," secondes")
 
 
-
+print(np.shape(mm))
 tc=np.load('timecodes.npy')
-display(m)
-t=tri(31,m)
+
+display(mm)
+t=tri(33,mm)
 ntc=inter_to_tc(t,tc)
-generate(file_path,ntc,300,0.5)
+print(generate(file_path,ntc,300,1))
+tps4=time.time()
+print("temps pour générer le morceau de 5min :",tps4-tps3," secondes")
