@@ -155,7 +155,31 @@ def matrice_dist (tab_fft,type_distance):
             if type_distance==3:
                 matrice[i][j]=distanceIS(tab_fft[i],tab_fft[j])
     return matrice
-
+def dist_3_by_3(tab_fft,type_dist):
+    matrice=np.ones((len(tab_fft),len(tab_fft)))
+    matrice=matrice*(-1)
+    for i in range(0,len(tab_fft)-1):
+        if i==0:                #On gère les cas où les intervalles en questions sont sur les extrémités et donc ne sont pas entouré par d'autres
+            vector1=np.concatenate((tab_fft[i],tab_fft[i+1],tab_fft[i+2]))      
+        if i==len(tab_fft)-1:
+            vector1=np.concatenate((tab_fft[i-2],tab_fft[i-1],tab_fft[i]))
+        else:
+            vector1=np.concatenate((tab_fft[i-1],tab_fft[i],tab_fft[i+1]))
+        for j in range(i,len(tab_fft)-1):
+            if j==0:               
+                vector2=np.concatenate((tab_fft[j],tab_fft[j+1],tab_fft[j+2]))      
+            if j==len(tab_fft)-1:
+                vector2=np.concatenate((tab_fft[j-2],tab_fft[j-1],tab_fft[j]))
+            else:
+                vector2=np.concatenate((tab_fft[j-1],tab_fft[j],tab_fft[j+1]))
+                
+            if type_distance=='eucl':
+                matrice[i][j]=distance_eucl(vector1,vector2)
+            if type_distance=='IS':
+                matrice[i][j]=distanceKL(vector1,vector2)
+            if type_distance=='KL':
+                matrice[i][j]=distanceIS(vector1,vector2)
+    return matrice
 
 
 
