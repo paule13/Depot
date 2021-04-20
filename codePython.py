@@ -146,7 +146,7 @@ def matrice_dist (tab_fft,type_distance):
     matrice=np.ones((len(tab_fft),len(tab_fft)))
     matrice=matrice*(-1)
     print("nombre de fft ",len(tab_fft))
-    for i in range(0,len(tab_fft)-2):
+    for i in range(0,len(tab_fft)-3):
         for j in range(i+2,len(tab_fft)-1):
             if type_distance==1:
                 matrice[i][j]=distance_eucl(tab_fft[i],tab_fft[j])
