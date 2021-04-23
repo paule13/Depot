@@ -25,21 +25,13 @@ def get_fft(data):
    yf=rfft(data)
    return yf
 
-def audiosegment_to_librosawav(audiosegment):    
-    samples = audiosegment.get_array_of_samples()
-    arr = np.array(samples).astype(np.float32)/32768 # 16 bit 
-    arr = librosa.core.resample(arr, audiosegment.frame_rate*2, 22050, res_type='kaiser_best') 
-    return arr
+
 
 #Affiche la transformée de fourier
-def display_fft(file_path):
-   samples, sampling_rate = librosa.load(file_path,sr=None, mono=True, offset=0.0,duration=None )        
-   duration = librosa.get_duration(y=samples, sr=sampling_rate)
-   fs, data = wavfile.read(file_path)
-   data = np.mean(data, axis=1)
+def display_fft(fft):
    N=duration*sampling_rate
    N=int(N)
-   yf=rfft(data)
+   yf=fft
    yf=yf[:len(yf)//2]
    xf=rfftfreq(N//2,1/sampling_rate)
    xf=np.delete(xf,len(xf)-1)
@@ -47,10 +39,15 @@ def display_fft(file_path):
    plt.show()
    return yf
 
+def audiosegment_to_librosawav(audiosegment):    
+    samples = audiosegment.get_array_of_samples()
+    arr = np.array(samples).astype(np.float32)/32768 # 16 bit 
+    arr = librosa.core.resample(arr, audiosegment.frame_rate*2, 22050, res_type='kaiser_best') 
+    return arr
 
 
-def get_time_codes(file_path,coeff):
-   samples, sampling_rate = librosa.load(file_path,sr=None, mono=True, offset=0.0,duration=None )        
+
+def get_time_codes(samples,sampling_rate,coeff,nameTC):      
    duration = librosa.get_duration(y=samples, sr=sampling_rate)
    tempo, beats = librosa.beat.beat_track(y=samples, sr=sampling_rate)
    tab=librosa.frames_to_time(beats, sr=sampling_rate)
@@ -69,18 +66,19 @@ def get_time_codes(file_path,coeff):
            for k in range (1,invert_coeff):
                new_tab.append(tab[i]+dist*coeff*k)
            i+=1
-   np.save('timecodes',new_tab) 
+   np.save(nameTC,new_tab) 
    return new_tab
 
 
-def get_all_fft(file_path,coeff):
-    time_codes=get_time_codes(file_path, coeff)
+def get_all_fft(file_path,coeff,nameTC):
+    samples, sampling_rate = librosa.load(file_path,sr=None, mono=True, offset=0.0,duration=None ) 
+    time_codes=get_time_codes(samples,sampling_rate,coeff,nameTC)
     fft_tab=[]
     min_len_fft=23000
     for i in range (1,len(time_codes)):
         newAudio = AudioSegment.from_wav(file_path)
         newAudio = newAudio[time_codes[i-1]*1000:time_codes[i]*1000]
-        data = newAudio.get_array_of_samples()
+        data = audiosegment_to_librosawav(newAudio)
         fft=get_fft(data)
         if i==1:    #On cherche le fft de longueur minimale
             min_len_fft=len(fft)
@@ -93,7 +91,48 @@ def get_all_fft(file_path,coeff):
     return fft_tab_norm
 
 
+def get_all_chromas(file_path,coeff):
+    samples, sampling_rate = librosa.load(file_path,sr=None, mono=True, offset=0.0,duration=None ) 
+    time_codes=get_time_codes(samples,sampling_rate,coeff)
+    chromas_tab=[]
+    min_len_chroma=2
+    for i in range (1,len(time_codes)):
+        newAudio = AudioSegment.from_wav(file_path)
+        newAudio = newAudio[time_codes[i-1]*1000:time_codes[i]*1000]
+        data = audiosegment_to_librosawav(newAudio)
+        chroma=librosa.feature.chroma_cqt(y=samples, sr=sampling_rate)
+        if i==1:    #On cherche le fft de longueur minimale
+            min_len_chroma=len(chroma)
+        else:
+            if min_len_chroma>len(chroma):
+                min_len_chroma=len(chroma)
+        chromas_tab.append(chroma)     
+    #chroma_tab_norm=normalize_size(chromas_tab, min_len_chroma)
+    print("Taille du plus cours fft =",min_len_chroma)
+    return chromas_tab
 
+def get_all_mfcc(file_path,coeff):
+    samples, sampling_rate = librosa.load(file_path,sr=None, mono=True, offset=0.0,duration=None ) 
+    time_codes=get_time_codes(samples,sampling_rate,coeff)
+    mfcc_tab=[]
+    min_len_mfcc=2
+    for i in range (1,len(time_codes)):
+        newAudio = AudioSegment.from_wav(file_path)
+        newAudio = newAudio[time_codes[i-1]*1000:time_codes[i]*1000]
+        data = audiosegment_to_librosawav(newAudio)
+        mfcc=librosa.feature.mfcc(y=samples, sr=sampling_rate)
+        if i==1:    #On cherche le fft de longueur minimale
+            min_len_mfcc=len(mfcc)
+        else:
+            if min_len_mfcc>len(mfcc):
+                min_len_mfcc=len(mfcc)
+        mfcc_tab.append(mfcc)     
+    #chroma_tab_norm=normalize_size(chromas_tab, min_len_chroma)
+    print("Taille du plus cours mfcc =",min_len_mfcc)
+    return mfcc_tab
+
+
+        
 def normalize_size(T,mini):
     normalized_tab=[]
     for tab in T:
@@ -136,25 +175,32 @@ def distanceIS(tab1,tab2):
     return s
 
 
-def make_sym(a):
-    w, h = a.shape
-    a[w - w // 2 :, :] = np.flipud(a[:w // 2, :])
-    a[:, h - h // 2:] = np.fliplr(a[:, :h // 2])                
+def make_sym(matrice):
+    height=np.shape(matrice)[0]
+    for i in range(0,height):
+        for j in range(i,height):
+            matrice[j][i]=matrice[i][j]              
+    return matrice
 
 
 def matrice_dist (tab_fft,type_distance):
     matrice=np.ones((len(tab_fft),len(tab_fft)))
     matrice=matrice*(-1)
     print("nombre de fft ",len(tab_fft))
-    for i in range(0,len(tab_fft)-3):
+    for i in range(0,len(tab_fft)-2):
         for j in range(i+2,len(tab_fft)-1):
-            if type_distance==1:
+            if type_distance=='eucl':
                 matrice[i][j]=distance_eucl(tab_fft[i],tab_fft[j])
-            if type_distance==2:
+            if type_distance=='IS':
                 matrice[i][j]=distanceKL(tab_fft[i],tab_fft[j])
-            if type_distance==3:
+            if type_distance=='KL':
                 matrice[i][j]=distanceIS(tab_fft[i],tab_fft[j])
     return matrice
+
+
+    
+
+
 def dist_3_by_3(tab_fft,type_dist):
     matrice=np.ones((len(tab_fft),len(tab_fft)))
     matrice=matrice*(-1)
@@ -183,7 +229,6 @@ def dist_3_by_3(tab_fft,type_dist):
 
 
 
-
 def minimum(matrice):
     mini=[]
     for i in range(0,len(matrice)):
@@ -193,7 +238,7 @@ def minimum(matrice):
         else:   
             m=(liste[0],0)
         for k in range (0,len(liste)):
-            if liste[k]<m[0] and k!=i and liste[k]>0.001 and liste[k]!=-1:
+            if liste[k]<m[0] and liste[k]>0.001 and liste[k]!=-1:
                 m=(liste[k],k)
         mini.append(m)
     return mini
@@ -262,8 +307,72 @@ def generate(file_path,newtimecodes,length,prob):
         duree+=abs(fin-debut)
         tab_duree.append(int(duree))
         debut=newtimecodes[j][1]
+        
+    finalSegment=newAudio[debut*1000:newAudio.duration_seconds*1000]
+    endArray = audiosegment_to_librosawav(intervalle) 
+    endOut = endArray.copy()                              
+    apply_fadein(endOut, sr, 0.1)
+    finalArray=np.concatenate((finalArray,endOut))
+    soundfile.write('testes.wav', endOut, samplerate=sr)
     soundfile.write('InfiniteAudio.wav', finalArray, samplerate=sr)
     return tab_duree
+
+def generate_mix_2_musiques(file_path1,file_path2,jumps1,jumps2,length,prob):
+    orig1, sr1 = librosa.load(file_path1)
+    orig2, sr2 = librosa.load(file_path2)
+    if len(jumps1)==0 and len(jumps2)==0:
+        print('Aucune similarité détecté avec ces paramètres')
+        return False
+    tab_duree=[]
+    duree=0
+    musique1 = AudioSegment.from_wav(file_path1)
+    musique2 = AudioSegment.from_wav(file_path2)
+    finalArray=[]
+    debut=0
+    while duree<length:
+        fin=jumps1[0][0]
+        j=0
+        print(debut)
+        while fin<debut+0.001 or proba(prob)==False:
+            if j==len(jumps1)-1:
+                j=0
+            j+=1
+            fin=jumps1[j][0]
+            
+        intervalle = musique1[debut*1000:fin*1000]
+        array = audiosegment_to_librosawav(intervalle)  
+        out = array.copy()
+        apply_fadein(out, sr1, 0.1)
+        apply_fadeout(out, sr1, 0.1)
+        finalArray=np.concatenate((finalArray,out))     
+        duree+=abs(fin-debut)
+        tab_duree.append(int(duree))
+        
+        if duree<length:
+            debut=jumps1[j][1]
+            fin=jumps2[0][0]
+            j=0
+            while fin<debut+0.001 or proba(prob)==False:
+                if j==len(jumps2)-1:
+                    j=0
+                j+=1
+                fin=jumps1[j][0]
+            intervalle2 = musique2[debut*1000:fin*1000]
+            array = audiosegment_to_librosawav(intervalle2)  
+            out = array.copy()
+            apply_fadein(out, sr2, 0.1)
+            apply_fadeout(out, sr2, 0.1)
+            finalArray=np.concatenate((finalArray,out))     
+            duree+=abs(fin-debut)
+            tab_duree.append(int(duree))
+        debut=jumps2[j][1]
+    soundfile.write('Mix2musiques.wav', finalArray, samplerate=sr1)
+    return tab_duree  
+
+
+
+
+
 
 
 def apply_fadeout(audio, sr, duration):
@@ -274,6 +383,7 @@ def apply_fadeout(audio, sr, duration):
     fade_curve = -np.sin(x)
     audio[start:end] = audio[start:end] * fade_curve
     
+    
 def apply_fadein(audio, sr, duration):
     length = int(duration*sr)
     end = length
@@ -282,10 +392,102 @@ def apply_fadein(audio, sr, duration):
     fade_curve = np.sin(fade_curve)
     audio[start:end] = audio[start:end] * fade_curve    
     
-file_path="./Get_lucky.wav"
+
+
+def normalize_2_musics(tab1,tab2):
+    if len(tab1[0])<len(tab2[0]):
+        tab2=normalize_size(tab2, len(tab1[0]))
+    else:
+        tab1=normalize_size(tab1, len(tab2[0]))
+    return tab1,tab2
+        
+def matrice_dist_2musiques(vectors1,vectors2):
+    matrice=np.ones((len(vectors1),len(vectors2)))
+    matrice=matrice*(-1)
+    print("nombre de vecteurs du morceau 1: ",len(vectors1))
+    print("nombre de vecteurs du morceau 2: ",len(vectors2))
+    for i in range(0,len(vectors1)-1):
+        for j in range(0,len(vectors2)-1):
+            matrice[i][j]=distance_eucl(vectors1[i], vectors2[j])
+    return matrice
+
+
+def minimums_matrice_2_musiques(matrice):
+    mini1=[]
+    mini2=[]
+    for i in range (0,matrice.shape[0]):
+        liste=matrice[i]
+        if i==0:
+            m=(liste[1],1)
+        else:   
+            m=(liste[0],0)
+        for k in range (0,matrice.shape[1]):
+            if liste[k]<m[0] and liste[k]>0.001 and liste[k]!=-1:
+                m=(liste[k],k)
+        mini1.append(m)
+    for i in range (0,matrice.shape[1]):
+        if i==0:
+            m=(matrice[0][i],1)
+        else:   
+            m=(matrice[0][0],0)
+        for k in range (0,matrice.shape[0]):
+            if matrice[k][i]<m[0] and matrice[k][i]>0.001 and matrice[k][i]!=-1:
+                m=(matrice[k][i],k)
+        mini2.append(m)
+    return mini1,mini2
+
+def seuil(matrice_mini,seuil):
+    trie=[]
+    for i in range(0,len(matrice_mini)-1):
+        if matrice_mini[i][0]<seuil:
+            trie.append((i,matrice_mini[i][1]))
+    return trie
+            
+
+def inter_to_tc_2(inter, tc1,tc2):
+    newtab=[]
+    for e in inter:
+        a=tc1[e[0]]
+        b=tc2[e[1]]
+        ntc=(a,b)
+        newtab.append(ntc)
+    return newtab
+        
+
+
+
+file_path="./music1.wav"
+file_path2="./music2.wav"
+
+
+
+mat=np.load('mat2mus.npy')
+print(mat.shape)
+mini1,mini2=minimums_matrice_2_musiques(mat)
+mini1=seuil(mini1,9)
+mini2=seuil(mini2,9)
+
+tc1=np.load('tc1.npy')
+tc2=np.load('tc2.npy')
+
+
+jumps1=inter_to_tc_2(mini1, tc1,tc2)
+jumps2=inter_to_tc_2(mini2, tc2,tc1)
+
+print(generate_mix_2_musiques(file_path, file_path2, jumps1, jumps2, 300,0.3))
+
+'''
+
+fft1=get_all_fft(file_path,1,'tc1')
+fft2=get_all_fft(file_path2,1,'tc2')
+fft1,fft2=normalize_2_musics(fft1, fft2)
+
+mat2mus=matrice_dist_2musiques(fft1, fft2)
+np.save('mat2mus',mat2mus)
+
 
 tps1=time.time()
-test = get_all_fft(file_path,1)
+test = get_all_fft(file_path,1,'tc')
 tps2=time.time()
 
 print("temps pour récupérer les ffts :",tps2-tps1," secondes")
@@ -296,10 +498,11 @@ mat=matrice_dist(test,'eucl')
 np.save('matrice_dist_10.txt', mat)
 tps3=time.time()
 
+
 mm=np.load('matrice_dist.npy')
 mm=make_sym(mm)
 
-print("temps pour comparer tous les ffts :",tps3-tps2," secondes")
+#print("temps pour comparer tous les ffts :",tps3-tps2," secondes")
 
 
 print(np.shape(mm))
@@ -310,4 +513,6 @@ t=tri(33,mm)
 ntc=inter_to_tc(t,tc)
 print(generate(file_path,ntc,300,1))
 tps4=time.time()
-print("temps pour générer le morceau de 5min :",tps4-tps3," secondes")
+#print("temps pour générer le morceau de 5min :",tps4-tps3," secondes")
+
+'''
