@@ -457,34 +457,6 @@ def inter_to_tc_2(inter, tc1,tc2):
 
 
 file_path="./music1.wav"
-file_path2="./music2.wav"
-
-
-
-mat=np.load('mat2mus.npy')
-print(mat.shape)
-mini1,mini2=minimums_matrice_2_musiques(mat)
-mini1=seuil(mini1,9)
-mini2=seuil(mini2,9)
-
-tc1=np.load('tc1.npy')
-tc2=np.load('tc2.npy')
-
-
-jumps1=inter_to_tc_2(mini1, tc1,tc2)
-jumps2=inter_to_tc_2(mini2, tc2,tc1)
-
-print(generate_mix_2_musiques(file_path, file_path2, jumps1, jumps2, 300,0.3))
-
-'''
-
-fft1=get_all_fft(file_path,1,'tc1')
-fft2=get_all_fft(file_path2,1,'tc2')
-fft1,fft2=normalize_2_musics(fft1, fft2)
-
-mat2mus=matrice_dist_2musiques(fft1, fft2)
-np.save('mat2mus',mat2mus)
-
 
 tps1=time.time()
 test = get_all_fft(file_path,1,'tc')
@@ -502,17 +474,20 @@ tps3=time.time()
 mm=np.load('matrice_dist.npy')
 mm=make_sym(mm)
 
-#print("temps pour comparer tous les ffts :",tps3-tps2," secondes")
+print("temps pour comparer tous les ffts :",tps3-tps2," secondes")
 
 
 print(np.shape(mm))
 tc=np.load('timecodes.npy')
 
 display(mm)
-t=tri(33,mm)
+t=tri(10,mm)
+
+
 ntc=inter_to_tc(t,tc)
 print(generate(file_path,ntc,300,1))
 tps4=time.time()
-#print("temps pour générer le morceau de 5min :",tps4-tps3," secondes")
 
-'''
+print("temps pour générer le morceau de 5min :",tps4-tps3," secondes")
+
+
