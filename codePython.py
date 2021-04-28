@@ -508,39 +508,38 @@ def matrice_tkinder (matrice):
 
     # Launch the GUI
     root.mainloop()
+nom=input('Nom du fichier audio (ne pas oubliter le .wav) = ')
 
-file_path="./music1.wav"
+file_path="./"+nom
 
+
+
+
+coeff=int( input('Nombre de beats par portion = '))
 tps1=time.time()
-test = get_all_fft(file_path,1,'tc')
+test = get_all_fft(file_path,coeff,'tc')
 tps2=time.time()
-
 print("temps pour récupérer les ffts :",tps2-tps1," secondes")
-
-
-
 mat=matrice_dist(test,'eucl')
 np.save('matrice_dist_10.txt', mat)
+
+
+
 tps3=time.time()
-
-
-mm=np.load('matrice_dist.npy')
+mm=np.load('matrice_dist_10.txt.npy')
 mm=make_sym(mm)
-
 print("temps pour comparer tous les ffts :",tps3-tps2," secondes")
-
-
 print(np.shape(mm))
-tc=np.load('timecodes.npy')
-
+tc=np.load('tc.npy')
 display(mm)
-t=tri(10,mm)
-
-
+seuil=float(input("Seuil au delà duquel un saut n'est pas effectué = "))
+t=tri(seuil,mm)
 ntc=inter_to_tc(t,tc)
-print(generate(file_path,ntc,300,1))
+duree=int(input("Durée du son généré (en secondes) = "))
+prob=float(input("Probabilité d'efftuer un saut = "))
+print(generate(file_path,ntc,duree,prob))
 tps4=time.time()
-
 print("temps pour générer le morceau de 5min :",tps4-tps3," secondes")
+
 
 
