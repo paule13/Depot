@@ -1,10 +1,12 @@
 1) Dans le répertoire où se trouve le code de l'Infinite JukeBox, placer une musique au format wave.
 2) Executer le code et renseigner les differents paramètre qui vont vous être demandés au fur et à mesure de l'exécution sur l'interpréteur Python
-3) Le tableau affiché à la fin correspond aux differents moments du fichier audio généré où un saut est effectué dans le morceau de base. 
-4) Vous pouvez écouter le son généré au format wave nommé "InfiniteAudio.wav" dans ce même répertoire.
+3) Vous pouvez écouter le son généré au format wave nommé "InfiniteAudio.wav" dans ce même répertoire.
 
 
 Remarques:
+
+Le tableau affiché à la fin correspond aux differents moments du fichier audio généré où un saut est effectué dans le morceau de base. 
+
 Pour ce qui est du seuil, il faut savoir qu'un seuil permettant d'éliminer environ la moitié des sauts possibles est de 
 13 mais cela varie en fonction des musiques et de autres paramètes bien évidement.
 
